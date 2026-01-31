@@ -38,8 +38,8 @@ let hitCount = 0;
 const HIT_MAX = 9999999;
 let isCongratulated = false;
 
-const FIRE_INTERVAL = 90; // 連射速度（重い端末なら 100〜120推奨）
-const MAX_BEANS = 12;     // 同時豆数（端末が弱いなら 8〜10）
+const FIRE_INTERVAL = 110; // 連射速度（重い端末なら 100〜120推奨）
+const MAX_BEANS = 10;     // 同時豆数（端末が弱いなら 8〜10）
 
 // =========================
 // 音：WebAudio（iPhoneで途切れにくい）
