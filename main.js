@@ -12,6 +12,15 @@ async function startCamera() {
   }
 }
 
+let hurtTimer = null;
+
+function setOniState(state) {
+  // state: "idle" or "hurt"
+  oni.classList.remove("idle", "hurt");
+  oni.classList.add(state);
+}
+
+
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 
@@ -121,9 +130,16 @@ function hitOni() {
     congratsEl.classList.add("show");
   }
 
-  // 見た目リアクションはロック
-  if (hurtLock) return;
-  hurtLock = true;
+    // === 見た目リアクション（毎回ちゃんと発火する版） ===
+  setOniState("hurt");
+
+  // 連射中に何回当たっても「戻る」を延長する
+  if (hurtTimer) clearTimeout(hurtTimer);
+  hurtTimer = setTimeout(() => {
+    setOniState("idle");
+    hurtTimer = null;
+  }, 140);
+
 
   oni.classList.remove("idle");
 oni.classList.add("hurt");
@@ -131,8 +147,6 @@ oni.classList.add("hurt");
 setTimeout(() => {
   oni.classList.remove("hurt");
   oni.classList.add("idle");
-  oni.style.transform = "translateX(-50%)";
-  hurtLock = false;
 }, 140);
 
 }

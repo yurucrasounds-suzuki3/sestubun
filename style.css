@@ -12,18 +12,25 @@ body {
   left: 50%;
   transform: translateX(-50%);
   height: 80vh;
-  width: 60vw;              /* ざっくり。見た目で調整OK */
-  max-width: 420px;         /* 大きくなりすぎ防止 */
+
+  /* ここが重要：縦横比を固定して width 自動計算 */
+  aspect-ratio: 2 / 3;
+  width: auto;
+
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: contain;
 
-  /* iPhone対策 */
+  /* iPhone長押し系 */
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-user-drag: none;
 }
+
+#oni.idle { background-image: url("assets/oni_idle.png"); }
+#oni.hurt { background-image: url("assets/oni_hurt.png"); }
+
 
 /* 状態で画像を切り替え */
 #oni.idle { background-image: url("assets/oni_idle.png"); }
