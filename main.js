@@ -1,5 +1,14 @@
 // =========================
-// カメラ（軽量設定：低スペ端末も意識）
+//  豆まきAR（マーカーなし）iPhone安定版 main.js（mp3/HTMLAudio）
+//  - カメラ軽量
+//  - 豆プール（DOM生成しない）
+//  - 音は mp3（HTMLAudio）に戻す：最優先で「鳴る」
+//  - バックグラウンド後に無音になったら次タップで復帰
+//  - 連射は安定優先（ゆっくり）
+// =========================
+
+// =========================
+// カメラ（軽量）
 // =========================
 async function startCamera() {
   const video = document.getElementById("cam");
@@ -28,67 +37,80 @@ const counterEl = document.getElementById("hit-counter");
 const congratsEl = document.getElementById("congrats");
 const hintEl = document.getElementById("hint");
 
-// 長押しメニュー抑止（保険）
+// 右クリック/長押しメニュー抑止（保険）
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // =========================
-// 設定
+// ゲーム設定
 // =========================
 let hitCount = 0;
 const HIT_MAX = 9999999;
 let isCongratulated = false;
 
-const FIRE_INTERVAL = 140; // 連射速度（重い端末なら 100〜120推奨）
-const MAX_BEANS = 10;     // 同時豆数（端末が弱いなら 8〜10）
+// 連射は“安定優先”
+const FIRE_INTERVAL = 130;
+
+// 同時豆数（端末が弱いなら 8）
+const MAX_BEANS = 6;
+
+// 音：毎回鳴らすとiPhoneが詰まる端末があるので間引く
+// 1=毎回 / 2=2回に1回 / 3=3回に1回
+const SOUND_DIVIDER = 1;
 
 // =========================
-// 音：WebAudio（iPhoneで途切れにくい）
+// 音（mp3 / HTMLAudio：とにかく鳴る方）
 // =========================
-let audioCtx = null;
-let hitBuffer = null;
-let hitGain = null;
-let audioReady = false;
+const hitSound = new Audio("assets/hit.mp3");
+hitSound.preload = "auto";
+hitSound.volume = 0.55;
 
-async function initWebAudio() {
-  if (audioCtx) return;
+let audioUnlocked = false;
+let audioStale = true; // バックグラウンド等で「また解放が必要」になることがある
 
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  hitGain = audioCtx.createGain();
-  hitGain.gain.value = 0.6; // 0.4〜0.9で調整
-  hitGain.connect(audioCtx.destination);
+function unlockAudioOnce() {
+  if (audioUnlocked && !audioStale) return;
 
-  const res = await fetch("assets/hit.mp3");
-  const arr = await res.arrayBuffer();
-  hitBuffer = await audioCtx.decodeAudioData(arr);
-  audioReady = true;
-}
+  // 「初回 or stale のときだけ」実行
+  audioUnlocked = true;
+  audioStale = false;
 
-async function unlockAudio() {
-  try {
-    await initWebAudio();
-    if (audioCtx && audioCtx.state !== "running") await audioCtx.resume();
-  } catch (e) {
-    // 音が使えない環境でもゲームは動かす
-  }
+  // iPhone Safari対策：ユーザー操作中に一度再生→停止して解放
+  // 失敗してもOK（次のタップでまた試す）
+  hitSound.currentTime = 0;
+  hitSound.play()
+    .then(() => {
+      hitSound.pause();
+      hitSound.currentTime = 0;
+    })
+    .catch(() => {});
 }
 
 function playHitSound() {
-  if (!audioCtx || !audioReady || !hitBuffer || audioCtx.state !== "running") return;
-
-  const src = audioCtx.createBufferSource();
-  src.buffer = hitBuffer;
-  src.connect(hitGain);
-  src.start(0);
+  try {
+    // 連打でも崩れにくい形（同時再生はしない）
+    hitSound.pause();
+    hitSound.currentTime = 0;
+    hitSound.play().catch(() => {});
+  } catch (e) {}
 }
 
+// バックグラウンド等で無音化したら「次タップで再解放」させる
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) audioStale = true;
+});
+window.addEventListener("pagehide", () => (audioStale = true));
+window.addEventListener("blur", () => (audioStale = true));
+window.addEventListener("focus", () => (audioStale = true));
+
 // =========================
-// 「いてっ」
+// UI：いてっ
 // =========================
 const HIT_WORDS = ["いてっ", "ぐぁっ", "くっ"];
 const TEXT_PROB = 0.4;
 
 function showHitText() {
   if (Math.random() > TEXT_PROB) return;
+
   const rect = oni.getBoundingClientRect();
   const text = document.createElement("div");
   text.className = "hit-text";
@@ -100,9 +122,10 @@ function showHitText() {
 }
 
 // =========================
-// 鬼の状態切替（当たり続けたらhurt維持）
+// 鬼の状態（hurt維持）
 // =========================
 let hurtTimer = null;
+
 function setOniState(state) {
   oni.classList.remove("idle", "hurt");
   oni.classList.add(state);
@@ -118,12 +141,10 @@ function flashHurt() {
 }
 
 // =========================
-// ヒット処理
-// ※ iPhoneで気持ちよくするコツ：
-//   - 連射中の「パシッ音」は “投げた瞬間” に鳴らす
-//   - onHit() は当たりの演出（いてっ/痛い画像/カウント）に集中
+// ヒット処理（演出）
 // =========================
 function onHit() {
+  playHitSound();
   showHitText();
   flashHurt();
 
@@ -147,7 +168,7 @@ function onHit() {
 }
 
 // =========================
-// 鬼の出現：画面タップで置く（マーカー不要）
+// 鬼の出現（タップで置く）
 // =========================
 let oniPlaced = false;
 
@@ -161,7 +182,7 @@ function placeOniAt(x, y) {
 }
 
 // =========================
-// 豆プール（DOM生成をやめる → 連射が気持ちよくなる）
+// 豆プール（使い回し）
 // =========================
 const beanPool = [];
 let beanIdx = 0;
@@ -199,7 +220,6 @@ function throwBean(x, y) {
   bean.style.left = startX + "px";
   bean.style.top = startY + "px";
 
-  // 既存アニメが走ってたら止めて再利用（詰まり防止）
   if (bean._anim) bean._anim.cancel();
 
   bean._anim = bean.animate(
@@ -220,13 +240,14 @@ function throwBean(x, y) {
 }
 
 // =========================
-// 長押し連射：鬼を押してる間だけ撃つ（rAF）
+// 長押し連射（rAF + 安定間隔）
 // =========================
 let isFiring = false;
 let rafId = null;
 let lastShotAt = 0;
-let lastX = 0,
-  lastY = 0;
+let lastX = 0;
+let lastY = 0;
+let soundTick = 0;
 
 function startFiringAt(x, y) {
   if (!oniPlaced) return;
@@ -236,6 +257,7 @@ function startFiringAt(x, y) {
   lastX = x;
   lastY = y;
   lastShotAt = 0;
+  soundTick = 0;
 
   const loop = (t) => {
     if (!isFiring) return;
@@ -244,17 +266,18 @@ function startFiringAt(x, y) {
     if (t - lastShotAt >= FIRE_INTERVAL) {
       throwBean(lastX, lastY);
 
-      // ★ ここが肝：投げた瞬間に鳴らすと “だーーー” が安定
-      playHitSound();
+      // ★音は間引く（iPhone安定）
+      if ((soundTick++ % SOUND_DIVIDER) === 0) {
+      }
 
       lastShotAt = t;
     }
     rafId = requestAnimationFrame(loop);
   };
 
-  // 押した瞬間の一発（音も鳴らす）
+  // 押した瞬間の一発
   throwBean(lastX, lastY);
-  playHitSound();
+  
 
   rafId = requestAnimationFrame(loop);
 }
@@ -266,7 +289,7 @@ function stopFiring() {
 }
 
 // =========================
-// 入力：iPhone安定（touch優先）
+// 入力（touch優先）
 // =========================
 function isOnOni(x, y) {
   if (!oniPlaced) return false;
@@ -274,25 +297,23 @@ function isOnOni(x, y) {
   return x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
 }
 
-// 画面タップ：鬼が未配置なら置く
 document.addEventListener(
   "touchstart",
-  async (e) => {
+  (e) => {
     e.preventDefault();
 
-    // ★最重要：ユーザー操作中に音を解放
-    await unlockAudio();
+    // ★毎回：音の解放（無音化したら次タップで復活）
+    unlockAudioOnce();
 
     const t = e.touches[0];
-    const x = t.clientX,
-      y = t.clientY;
+    const x = t.clientX;
+    const y = t.clientY;
 
     if (!oniPlaced) {
       placeOniAt(x, y);
       return;
     }
 
-    // 鬼の上なら長押し連射開始
     if (isOnOni(x, y)) {
       startFiringAt(x, y);
     }
@@ -330,21 +351,19 @@ document.addEventListener(
   { passive: false }
 );
 
-// pointer fallback（PC）
-document.addEventListener("pointerdown", async (e) => {
+// PC fallback
+document.addEventListener("pointerdown", (e) => {
   e.preventDefault?.();
-  await unlockAudio();
+  unlockAudioOnce();
 
-  const x = e.clientX,
-    y = e.clientY;
+  const x = e.clientX;
+  const y = e.clientY;
 
   if (!oniPlaced) {
     placeOniAt(x, y);
     return;
   }
-  if (isOnOni(x, y)) {
-    startFiringAt(x, y);
-  }
+ startFiringAt(x, y);
 });
 
 document.addEventListener("pointermove", (e) => {
