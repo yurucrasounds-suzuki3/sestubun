@@ -1,236 +1,217 @@
-async function startCamera() {
+// =========================
+// カメラ（疑似AR）
+// =========================
+async function startCamera(){
   const video = document.getElementById("cam");
-  try {
+  try{
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment" },
       audio: false
     });
     video.srcObject = stream;
-  } catch (err) {
-    console.error("Camera error:", err);
-    alert("カメラの許可が必要です！");
+  }catch(err){
+    console.error(err);
+    // カメラがダメでもゲームは動く
   }
 }
-
-let hurtTimer = null;
-
-function setOniState(state) {
-  // state: "idle" or "hurt"
-  oni.classList.remove("idle", "hurt");
-  oni.classList.add(state);
-}
-
-
-document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-
 startCamera();
 
+// =========================
+// DOM
+// =========================
+const oni = document.getElementById("oni");
+const counterEl = document.getElementById("hit-counter");
+const congratsEl = document.getElementById("congrats");
+
+// 右クリック/長押しメニュー抑止（保険）
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+// =========================
+// 設定
+// =========================
+let hitCount = 0;
+const HIT_MAX = 9999999;
+let isCongratulated = false;
+
+const FIRE_INTERVAL = 90; // 連射速度
+let isFiring = false;
+let fireTimer = null;
+let lastX = 0, lastY = 0;
+
+// ヒット音（mp3プール）
+const HIT_SOUNDS = Array.from({length: 8}, () => new Audio("assets/hit.mp3"));
+HIT_SOUNDS.forEach(s => { s.preload="auto"; s.volume=0.35; });
+let hitIndex = 0;
+
 let audioUnlocked = false;
-
-function unlockAudio() {
-  if (audioUnlocked) return;
+function unlockAudio(){
+  if(audioUnlocked) return;
   audioUnlocked = true;
-
-  HIT_SOUNDS.forEach(s => {
-    s.play().then(() => {
+  // 1回だけ“解放”
+  HIT_SOUNDS.forEach(s=>{
+    s.play().then(()=>{
       s.pause();
       s.currentTime = 0;
-    }).catch(() => {});
+    }).catch(()=>{});
   });
 }
 
-// =========================
-// カウンター & Congratulations
-// =========================
-const counterEl = document.getElementById("hit-counter");
-let hitCount = 0;
-const HIT_MAX = 9999999;
-
-const congratsEl = document.getElementById("congrats");
-let isCongratulated = false;
-
-// =========================
-// 豆まき本体
-// =========================
-const oni = document.getElementById("oni");
-
-// --- 連射設定 ---
-const FIRE_INTERVAL = 90;
-
-let isFiring = false;
-let fireTimer = null;
-let lastX = null;
-let lastY = null;
-
-// --- ヒット音プール ---
-const HIT_SOUNDS = Array.from({ length: 8 }, () => new Audio("assets/hit.mp3"));
-HIT_SOUNDS.forEach((s) => {
-  s.preload = "auto";
-  s.volume = 0.35;
-});
-
-let hitIndex = 0;
-
-function playHitSound() {
+function playHitSound(){
   const s = HIT_SOUNDS[hitIndex];
   hitIndex = (hitIndex + 1) % HIT_SOUNDS.length;
-  s.currentTime = 0;
-  s.play().catch(() => {});
+  s.currentTime = 0; // まずは0推奨（雑音あるなら0.02）
+  s.play().catch(()=>{});
 }
 
 // =========================
-// 「いてっ」文字
+// 「いてっ」
 // =========================
-const HIT_WORDS = ["いてっ", "ぐぁっ", "くっ"];
+const HIT_WORDS = ["いてっ","ぐぁっ","くっ"];
 const TEXT_PROB = 0.4;
 
-function showHitText() {
-  if (Math.random() > TEXT_PROB) return;
+function showHitText(){
+  if(Math.random() > TEXT_PROB) return;
 
   const rect = oni.getBoundingClientRect();
   const text = document.createElement("div");
   text.className = "hit-text";
-  text.textContent = HIT_WORDS[Math.floor(Math.random() * HIT_WORDS.length)];
-
-  text.style.left = rect.left + rect.width / 2 + "px";
-  text.style.top = rect.top + rect.height * 0.25 + "px";
-
+  text.textContent = HIT_WORDS[Math.floor(Math.random()*HIT_WORDS.length)];
+  text.style.left = (rect.left + rect.width/2) + "px";
+  text.style.top  = (rect.top  + rect.height*0.22) + "px";
   document.body.appendChild(text);
-  setTimeout(() => text.remove(), 500);
+  setTimeout(()=>text.remove(), 500);
 }
 
 // =========================
-// 鬼ヒット処理
+// 鬼の状態切替（iPhoneで確実に戻る方式）
 // =========================
-let hurtLock = false;
+let hurtTimer = null;
+function setOniState(state){
+  oni.classList.remove("idle","hurt");
+  oni.classList.add(state);
+}
 
-function hitOni() {
+function onHit(){
   playHitSound();
   showHitText();
 
   // カウント
-  if (hitCount < HIT_MAX) {
+  if(hitCount < HIT_MAX){
     hitCount++;
     counterEl.textContent = hitCount.toLocaleString();
-
     counterEl.animate(
-      [
-        { transform: "scale(1)" },
-        { transform: "scale(1.3)" },
-        { transform: "scale(1)" }
-      ],
-      { duration: 120, easing: "ease-out" }
+      [{transform:"translateX(-50%) scale(1)"},
+       {transform:"translateX(-50%) scale(1.25)"},
+       {transform:"translateX(-50%) scale(1)"}],
+      {duration: 120, easing:"ease-out"}
     );
   }
 
-  // Congratulations
-  if (hitCount === HIT_MAX && !isCongratulated) {
+  if(hitCount === HIT_MAX && !isCongratulated){
     isCongratulated = true;
     congratsEl.classList.add("show");
   }
 
-    // === 見た目リアクション（毎回ちゃんと発火する版） ===
+  // 見た目：当たるたびにhurt、当たらなくなったら戻る
   setOniState("hurt");
-
-  // 連射中に何回当たっても「戻る」を延長する
-  if (hurtTimer) clearTimeout(hurtTimer);
-  hurtTimer = setTimeout(() => {
+  if(hurtTimer) clearTimeout(hurtTimer);
+  hurtTimer = setTimeout(()=>{
     setOniState("idle");
     hurtTimer = null;
   }, 140);
-
-
-  oni.classList.remove("idle");
-oni.classList.add("hurt");
-
-setTimeout(() => {
-  oni.classList.remove("hurt");
-  oni.classList.add("idle");
-}, 140);
-
 }
 
 // =========================
-// 入力（長押し連射）
+// 豆投げ & 当たり判定
 // =========================
-document.addEventListener("pointerdown", (e) => {
-  e.preventDefault?.();
-  unlockAudio();
-  startFiring(e);
-});
-
-document.addEventListener("pointerup", stopFiring);
-document.addEventListener("pointercancel", stopFiring);
-document.addEventListener("pointerleave", stopFiring);
-
-document.addEventListener("pointermove", (e) => {
-  if (!isFiring) return;
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
-
-function startFiring(e) {
-  if (isFiring) return;
-  isFiring = true;
-
-  lastX = e.clientX;
-  lastY = e.clientY;
-
-  shootAt(lastX, lastY);
-
-  fireTimer = setInterval(() => {
-    shootAt(lastX, lastY);
-  }, FIRE_INTERVAL);
-}
-
-function stopFiring() {
-  isFiring = false;
-  if (fireTimer) clearInterval(fireTimer);
-  fireTimer = null;
-}
-
-// =========================
-// 豆 & 当たり判定
-// =========================
-function shootAt(x, y) {
-  throwBean(x, y);
-}
-
-function throwBean(x, y) {
+function throwBean(x, y){
   const bean = document.createElement("img");
   bean.src = "assets/bean.png";
   bean.className = "bean";
   document.body.appendChild(bean);
 
-  const startX = window.innerWidth / 2;
-  const startY = window.innerHeight;
+  const startX = window.innerWidth * 0.5;
+  const startY = window.innerHeight * 0.92;
 
   bean.style.left = startX + "px";
-  bean.style.top = startY + "px";
+  bean.style.top  = startY + "px";
 
   bean.animate(
     [
-      { transform: "translate(0,0)" },
-      { transform: `translate(${x - startX}px, ${y - startY}px)` }
+      { transform: "translate(-50%,-50%) scale(1)" },
+      { transform: `translate(${x-startX-17}px, ${y-startY-17}px) scale(0.9)` }
     ],
     { duration: 220, easing: "ease-out" }
   );
 
-  setTimeout(() => {
+  setTimeout(()=>{
     bean.remove();
-    checkHit(x, y);
+    const rect = oni.getBoundingClientRect();
+    const hit = (x > rect.left && x < rect.right && y > rect.top && y < rect.bottom);
+    if(hit) onHit();
   }, 200);
 }
 
-function checkHit(x, y) {
-  const rect = oni.getBoundingClientRect();
-  if (
-    x > rect.left &&
-    x < rect.right &&
-    y > rect.top &&
-    y < rect.bottom
-  ) {
-    hitOni();
-  }
+// =========================
+// 入力：iPhoneで安定する touch 優先 + pointer fallback
+// =========================
+function startFiringAt(x, y){
+  if(isFiring) return;
+  isFiring = true;
+  lastX = x; lastY = y;
+
+  throwBean(lastX, lastY);
+
+  fireTimer = setInterval(()=>{
+    throwBean(lastX, lastY);
+  }, FIRE_INTERVAL);
 }
+
+function stopFiring(){
+  isFiring = false;
+  if(fireTimer) clearInterval(fireTimer);
+  fireTimer = null;
+}
+
+// iOS：touch は passive:false にしないと preventDefault が効かない
+document.addEventListener("touchstart", (e)=>{
+  unlockAudio();
+  e.preventDefault();
+  const t = e.touches[0];
+  startFiringAt(t.clientX, t.clientY);
+}, {passive:false});
+
+document.addEventListener("touchmove", (e)=>{
+  e.preventDefault();
+  if(!isFiring) return;
+  const t = e.touches[0];
+  lastX = t.clientX;
+  lastY = t.clientY;
+}, {passive:false});
+
+document.addEventListener("touchend", (e)=>{
+  e.preventDefault();
+  stopFiring();
+}, {passive:false});
+
+document.addEventListener("touchcancel", (e)=>{
+  e.preventDefault();
+  stopFiring();
+}, {passive:false});
+
+// pointer fallback（PCなど）
+document.addEventListener("pointerdown", (e)=>{
+  unlockAudio();
+  e.preventDefault?.();
+  startFiringAt(e.clientX, e.clientY);
+});
+
+document.addEventListener("pointermove", (e)=>{
+  if(!isFiring) return;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+document.addEventListener("pointerup", stopFiring);
+document.addEventListener("pointercancel", stopFiring);
+document.addEventListener("pointerleave", stopFiring);
