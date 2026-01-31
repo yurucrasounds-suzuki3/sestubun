@@ -4,20 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>豆まきAR（疑似）</title>
+  <title>豆まきAR（マーカーなし）</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- カメラ背景（疑似AR） -->
+  <!-- カメラ背景 -->
   <video id="cam" autoplay playsinline muted></video>
 
   <!-- UI -->
   <div id="hit-counter">0</div>
   <div id="congrats">🎉 Congratulations!! 🎉</div>
+  <div id="hint">画面をタップして鬼を出す → 鬼を長押しで豆連射</div>
 
-  <!-- 鬼（imgじゃなくdiv背景） -->
-  <div id="oni" class="idle"></div>
+  <!-- 鬼（div背景で長押しメニュー回避） -->
+  <div id="oni" class="idle hidden"></div>
 
   <script src="main.js"></script>
 </body>
