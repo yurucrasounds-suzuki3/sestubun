@@ -1,9 +1,12 @@
 // =========================
-//  豆まき（ARなし）iPhone安定版 main.js
+//  豆まき（ARなし）iPhone安定版 main.js 完全版
 //  - カメラなし
 //  - 鬼固定表示（中央）
-//  - どこでも長押し連射
-//  - 音は「当たった時だけ」
+//  - どこでも長押し連射（指位置追従）
+//  - 当たった時だけ音（iPhoneで死ににくい：2音交互 + 間引き）
+//  - 豆プール（軽量）
+//  - 当たり判定は即（体感遅延ゼロ）
+//  - いてっ/痛がり/カウント/9999999でCongrats
 // =========================
 
 const oni = document.getElementById("oni");
@@ -11,7 +14,12 @@ const counterEl = document.getElementById("hit-counter");
 const congratsEl = document.getElementById("congrats");
 const hintEl = document.getElementById("hint");
 
+// 右クリック/長押しメニュー抑止（保険）
 document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// iOSの選択・長押し周りを減らす（CSSも後述推奨）
+document.body.style.webkitUserSelect = "none";
+document.body.style.userSelect = "none";
 
 // =========================
 // 設定
@@ -20,41 +28,56 @@ let hitCount = 0;
 const HIT_MAX = 9999999;
 let isCongratulated = false;
 
-const FIRE_INTERVAL = 130; // ゆっくりめで安定
+// 連射テンポ（iPhoneで気持ちいい＆安定帯）
+const FIRE_INTERVAL = 130;
+
+// 豆数（軽量）
 const MAX_BEANS = 8;
+
+// 音を鳴らす頻度（1=毎回, 2=2回に1回, 3=3回に1回）
+const SOUND_DIVIDER = 2;
 
 // =========================
 // 音（mp3 / HTMLAudio）
+//  - 2音交互：長押し連射でも死ににくい
+//  - pause() しない
 // =========================
-const hitSound = new Audio("assets/hit.mp3");
-hitSound.preload = "auto";
-hitSound.volume = 0.55;
+const hitSounds = [
+  new Audio("assets/hit.mp3"),
+  new Audio("assets/hit.mp3"),
+];
 
+hitSounds.forEach((s) => {
+  s.preload = "auto";
+  s.volume = 0.55;
+});
+
+let soundIndex = 0;
 let audioUnlocked = false;
 let audioStale = true;
 
+// 初回タップで音を解放（PWA/Safari対策）
 function unlockAudioOnce() {
   if (audioUnlocked && !audioStale) return;
+
   audioUnlocked = true;
   audioStale = false;
 
-  hitSound.currentTime = 0;
-  hitSound.play()
-    .then(() => {
-      hitSound.pause();
-      hitSound.currentTime = 0;
-    })
-    .catch(() => {});
+  // 2つとも一度だけ “短く再生→停止” して解放
+  hitSounds.forEach((s) => {
+    try {
+      s.currentTime = 0;
+      s.play()
+        .then(() => {
+          s.pause();
+          s.currentTime = 0;
+        })
+        .catch(() => {});
+    } catch (e) {}
+  });
 }
 
-function playHitSound() {
-  try {
-    hitSound.pause();
-    hitSound.currentTime = 0; // 雑音あるなら 0.02 に
-    hitSound.play().catch(() => {});
-  } catch (e) {}
-}
-
+// バックグラウンド等で無音化したら、次タップで再解放
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) audioStale = true;
 });
@@ -62,8 +85,19 @@ window.addEventListener("pagehide", () => (audioStale = true));
 window.addEventListener("blur", () => (audioStale = true));
 window.addEventListener("focus", () => (audioStale = true));
 
+function playHitSound() {
+  const s = hitSounds[soundIndex];
+  soundIndex = (soundIndex + 1) % hitSounds.length;
+
+  try {
+    // 雑音あるなら 0.02 にしてもOK
+    s.currentTime = 0;
+    s.play().catch(() => {});
+  } catch (e) {}
+}
+
 // =========================
-// 「いてっ」
+// UI：いてっ
 // =========================
 const HIT_WORDS = ["いてっ", "ぐぁっ", "くっ"];
 const TEXT_PROB = 0.4;
@@ -115,14 +149,22 @@ placeOniCenter();
 // =========================
 // ヒット処理（当たった時だけ音）
 // =========================
+let soundTick = 0;
+
 function onHit() {
-  playHitSound();
+  // 音は間引く（iPhone安定）
+  if ((soundTick++ % SOUND_DIVIDER) === 0) {
+    playHitSound();
+  }
+
   showHitText();
   flashHurt();
 
   if (hitCount < HIT_MAX) {
     hitCount++;
     counterEl.textContent = hitCount.toLocaleString();
+
+    // カウンターぷるん
     counterEl.animate(
       [
         { transform: "translateX(-50%) scale(1)" },
@@ -140,7 +182,7 @@ function onHit() {
 }
 
 // =========================
-// 豆プール
+// 豆プール（軽量）
 // =========================
 const beanPool = [];
 let beanIdx = 0;
@@ -164,7 +206,7 @@ function getBean() {
 }
 
 // =========================
-// 豆投げ＆当たり判定
+// 豆投げ（当たり判定は“即”）
 // =========================
 function throwBean(x, y) {
   const bean = getBean();
@@ -174,9 +216,9 @@ function throwBean(x, y) {
   const startY = window.innerHeight * 0.92;
 
   bean.style.left = startX + "px";
-  bean.style.top  = startY + "px";
+  bean.style.top = startY + "px";
 
-  // ★当たり判定は “即” 行う（遅延ゼロっぽく）
+  // ★当たり判定は即（遅延ゼロっぽく）
   const rect = oni.getBoundingClientRect();
   const hit = x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
   if (hit) onHit();
@@ -195,7 +237,6 @@ function throwBean(x, y) {
     bean.style.display = "none";
   };
 }
-
 
 // =========================
 // 長押し連射（どこでも）
@@ -225,6 +266,7 @@ function startFiringAt(x, y) {
     rafId = requestAnimationFrame(loop);
   };
 
+  // 押した瞬間の1発
   throwBean(lastX, lastY);
   rafId = requestAnimationFrame(loop);
 }
@@ -235,34 +277,53 @@ function stopFiring() {
   rafId = null;
 }
 
-// touch（iPhone）
-document.addEventListener("touchstart", (e) => {
-  e.preventDefault();
-  unlockAudioOnce();
+// =========================
+// 入力（touch優先：iPhone）
+// =========================
+document.addEventListener(
+  "touchstart",
+  (e) => {
+    e.preventDefault();
+    unlockAudioOnce();
 
-  const t = e.touches[0];
-  startFiringAt(t.clientX, t.clientY);
-}, { passive:false });
+    const t = e.touches[0];
+    startFiringAt(t.clientX, t.clientY);
+  },
+  { passive: false }
+);
 
-document.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-  if (!isFiring) return;
-  const t = e.touches[0];
-  lastX = t.clientX;
-  lastY = t.clientY;
-}, { passive:false });
+document.addEventListener(
+  "touchmove",
+  (e) => {
+    e.preventDefault();
+    if (!isFiring) return;
 
-document.addEventListener("touchend", (e) => {
-  e.preventDefault();
-  stopFiring();
-}, { passive:false });
+    const t = e.touches[0];
+    lastX = t.clientX;
+    lastY = t.clientY;
+  },
+  { passive: false }
+);
 
-document.addEventListener("touchcancel", (e) => {
-  e.preventDefault();
-  stopFiring();
-}, { passive:false });
+document.addEventListener(
+  "touchend",
+  (e) => {
+    e.preventDefault();
+    stopFiring();
+  },
+  { passive: false }
+);
 
-// PC
+document.addEventListener(
+  "touchcancel",
+  (e) => {
+    e.preventDefault();
+    stopFiring();
+  },
+  { passive: false }
+);
+
+// PC fallback
 document.addEventListener("pointerdown", (e) => {
   e.preventDefault?.();
   unlockAudioOnce();

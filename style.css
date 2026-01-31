@@ -106,3 +106,16 @@ html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; touc
   30%{opacity:1; transform:translate(-50%,-70%) scale(1.15);}
   100%{opacity:0; transform:translate(-50%,-110%) scale(1);}
 }
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  touch-action: none;          /* これが超効く */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* 長押しメニュー抑止 */
+}
+#oni, #hit-counter, #hint, #congrats {
+  -webkit-user-select: none;
+  user-select: none;
+}
