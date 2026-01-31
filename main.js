@@ -20,8 +20,8 @@ let hitCount = 0;
 const HIT_MAX = 9999999;
 let isCongratulated = false;
 
-const FIRE_INTERVAL = 160; // ゆっくりめで安定
-const MAX_BEANS = 10;
+const FIRE_INTERVAL = 110; // ゆっくりめで安定
+const MAX_BEANS = 12;
 
 // =========================
 // 音（mp3 / HTMLAudio）
