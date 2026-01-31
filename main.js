@@ -12,6 +12,9 @@ async function startCamera() {
   }
 }
 
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+
 startCamera();
 
 let audioUnlocked = false;
@@ -122,14 +125,16 @@ function hitOni() {
   if (hurtLock) return;
   hurtLock = true;
 
-  oni.src = "assets/oni_hurt.png";
-  oni.style.transform = "translateX(-50%) translateY(-10px)";
+  oni.classList.remove("idle");
+oni.classList.add("hurt");
 
-  setTimeout(() => {
-    oni.src = "assets/oni_idle.png";
-    oni.style.transform = "translateX(-50%)";
-    hurtLock = false;
-  }, 140);
+setTimeout(() => {
+  oni.classList.remove("hurt");
+  oni.classList.add("idle");
+  oni.style.transform = "translateX(-50%)";
+  hurtLock = false;
+}, 140);
+
 }
 
 // =========================

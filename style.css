@@ -6,14 +6,29 @@ body {
 }
 
 /* 鬼 */
-#oni {
+#oni{
   position: absolute;
   bottom: 0%;
   left: 50%;
   transform: translateX(-50%);
-  height: 80vh;      /* ←等身大っぽさの肝 */
-  width: auto;
+  height: 80vh;
+  width: 60vw;              /* ざっくり。見た目で調整OK */
+  max-width: 420px;         /* 大きくなりすぎ防止 */
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: contain;
+
+  /* iPhone対策 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
+
+/* 状態で画像を切り替え */
+#oni.idle { background-image: url("assets/oni_idle.png"); }
+#oni.hurt { background-image: url("assets/oni_hurt.png"); }
+
 
 
 /* 豆 */
