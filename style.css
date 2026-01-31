@@ -7,12 +7,13 @@ body {
 /* 鬼 */
 #oni {
   position: absolute;
-  bottom: 10%;
+  bottom: 0%;
   left: 50%;
   transform: translateX(-50%);
-  width: 240px;
-  transition: transform 0.1s;
+  height: 80vh;      /* ←等身大っぽさの肝 */
+  width: auto;
 }
+
 
 /* 豆 */
 .bean {
@@ -103,4 +104,14 @@ body { touch-action: none; }
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
+}
+#cam {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: -1; /* 背面にする */
+  background: #000;
 }

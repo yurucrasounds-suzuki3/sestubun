@@ -1,3 +1,20 @@
+async function startCamera() {
+  const video = document.getElementById("cam");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    console.error("Camera error:", err);
+    alert("カメラの許可が必要です！");
+  }
+}
+
+startCamera();
+
+
 // =========================
 // カウンター & Congratulations
 // =========================
