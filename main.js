@@ -20,8 +20,8 @@ let hitCount = 0;
 const HIT_MAX = 9999999;
 let isCongratulated = false;
 
-const FIRE_INTERVAL = 110; // ゆっくりめで安定
-const MAX_BEANS = 12;
+const FIRE_INTERVAL = 130; // ゆっくりめで安定
+const MAX_BEANS = 8;
 
 // =========================
 // 音（mp3 / HTMLAudio）
@@ -174,26 +174,28 @@ function throwBean(x, y) {
   const startY = window.innerHeight * 0.92;
 
   bean.style.left = startX + "px";
-  bean.style.top = startY + "px";
+  bean.style.top  = startY + "px";
+
+  // ★当たり判定は “即” 行う（遅延ゼロっぽく）
+  const rect = oni.getBoundingClientRect();
+  const hit = x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
+  if (hit) onHit();
 
   if (bean._anim) bean._anim.cancel();
 
   bean._anim = bean.animate(
     [
       { transform: "translate(-50%,-50%) scale(1)" },
-      { transform: `translate(${x - startX - 17}px, ${y - startY - 17}px) scale(0.9)` },
+      { transform: `translate(${x - startX}px, ${y - startY}px) scale(0.85)` },
     ],
-    { duration: 220, easing: "ease-out", fill: "forwards" }
+    { duration: 160, easing: "linear", fill: "forwards" }
   );
 
   bean._anim.onfinish = () => {
     bean.style.display = "none";
-
-    const rect = oni.getBoundingClientRect();
-    const hit = x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
-    if (hit) onHit();
   };
 }
+
 
 // =========================
 // 長押し連射（どこでも）
