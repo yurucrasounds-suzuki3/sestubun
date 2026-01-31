@@ -14,6 +14,19 @@ async function startCamera() {
 
 startCamera();
 
+let audioUnlocked = false;
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  HIT_SOUNDS.forEach(s => {
+    s.play().then(() => {
+      s.pause();
+      s.currentTime = 0;
+    }).catch(() => {});
+  });
+}
 
 // =========================
 // カウンター & Congratulations
@@ -50,7 +63,7 @@ let hitIndex = 0;
 function playHitSound() {
   const s = HIT_SOUNDS[hitIndex];
   hitIndex = (hitIndex + 1) % HIT_SOUNDS.length;
-  s.currentTime = 0.02;
+  s.currentTime = 0;
   s.play().catch(() => {});
 }
 
@@ -124,6 +137,7 @@ function hitOni() {
 // =========================
 document.addEventListener("pointerdown", (e) => {
   e.preventDefault?.();
+  unlockAudio();
   startFiring(e);
 });
 
