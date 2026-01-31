@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>豆まきAR（マーカー版）</title>
+  <style>
+    *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    html,body{ margin:0; height:100%; overflow:hidden; background:#000; }
+    #ui{
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      color:#fff; font-weight:900; font-size:40px;
+      text-shadow: 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000;
+      z-index: 9999; pointer-events:none;
+    }
+    #congrats{
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(.6);
+      color:#ffe600; font-weight:900; font-size:34px; opacity:0;
+      text-shadow: 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000;
+      z-index: 10000; pointer-events:none;
+    }
+    #congrats.show{
+      animation: pop .8s ease-out forwards;
+    }
+    @keyframes pop{
+      0%{opacity:0; transform:translate(-50%,-50%) scale(.6);}
+      40%{opacity:1; transform:translate(-50%,-50%) scale(1.2);}
+      100%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+    }
+    #hint{
+      position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,.9); font-size: 14px; z-index: 9999;
+      text-shadow: 2px 2px 0 #000;
+      pointer-events:none;
+      text-align:center;
+      line-height:1.35;
+      width: 92vw;
+      max-width: 520px;
+    }
+  </style>
+
+  <!-- A-Frame + AR.js（CDN） -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+</head>
+
+<body>
+  <div id="ui">0</div>
+  <div id="congrats">🎉 Congratulations!! 🎉</div>
+  <div id="hint">紙に「Hiroマーカー」を表示/印刷して机に置いてね。鬼をタップでヒット（長押し連射も対応）。</div>
+
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="colorManagement: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+  >
+    <a-assets>
+      <img id="oniIdle" src="assets/oni_idle.png" />
+      <img id="oniHurt" src="assets/oni_hurt.png" />
+    </a-assets>
+
+    <!-- タップ判定用：画面タップをレイにする（スマホOK） -->
+    <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+
+    <!-- Hiroマーカー -->
+    <a-marker preset="hiro">
+      <!-- 鬼：板ポリにPNG貼る（等身大感は scale で調整） -->
+      <a-plane
+        id="oniPlane"
+        class="clickable"
+        src="#oniIdle"
+        position="0 0.9 0"
+        rotation="-90 0 0"
+        width="1.0"
+        height="1.5"
+        material="transparent: true; alphaTest: 0.1;"
+      ></a-plane>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    // ===== 設定 =====
+    const HIT_MAX = 9999999;
+    const FIRE_INTERVAL = 90;
+
+    // ===== UI =====
+    const ui = document.getElementById("ui");
+    const congratsEl = document.getElementById("congrats");
+
+    let hitCount = 0;
+    let isCongratulated = false;
+
+    // ===== 音（iPhone対策：最初の操作でunlock） =====
+    const HIT_SOUNDS = Array.from({length: 8}, () => new Audio("assets/hit.mp3"));
+    HIT_SOUNDS.forEach(s => { s.preload = "auto"; s.volume = 0.35; });
+    let hitIndex = 0;
+    let audioUnlocked = false;
+
+    function unlockAudio(){
+      if(audioUnlocked) return;
+      audioUnlocked = true;
+      HIT_SOUNDS.forEach(s=>{
+        s.play().then(()=>{ s.pause(); s.currentTime = 0; }).catch(()=>{});
+      });
+    }
+
+    function playHitSound(){
+      const s = HIT_SOUNDS[hitIndex];
+      hitIndex = (hitIndex + 1) % HIT_SOUNDS.length;
+      s.currentTime = 0;
+      s.play().catch(()=>{});
+    }
+
+    // ===== 鬼の見た目切替（確実に戻る方式） =====
+    const oniPlane = document.getElementById("oniPlane");
+    let hurtTimer = null;
+
+    function flashHurt(){
+      oniPlane.setAttribute("src", "#oniHurt");
+      if(hurtTimer) clearTimeout(hurtTimer);
+      hurtTimer = setTimeout(()=>{
+        oniPlane.setAttribute("src", "#oniIdle");
+        hurtTimer = null;
+      }, 140);
+    }
+
+    // ===== ヒット処理 =====
+    function onHit(){
+      unlockAudio();
+      playHitSound();
+      flashHurt();
+
+      if(hitCount < HIT_MAX){
+        hitCount++;
+        ui.textContent = hitCount.toLocaleString();
+      }
+
+      if(hitCount === HIT_MAX && !isCongratulated){
+        isCongratulated = true;
+        congratsEl.classList.add("show");
+      }
+    }
+
+    // ===== タップでヒット（まず確実に動く基本） =====
+    oniPlane.addEventListener("click", onHit);
+
+    // ===== 長押し連射（指を離すまで、鬼に当たり続ける） =====
+    let isFiring = false;
+    let timer = null;
+
+    function startFiring(){
+      if(isFiring) return;
+      isFiring = true;
+      onHit(); // 最初の一発
+
+      timer = setInterval(()=>{
+        onHit();
+      }, FIRE_INTERVAL);
+    }
+
+    function stopFiring(){
+      isFiring = false;
+      if(timer) clearInterval(timer);
+      timer = null;
+    }
+
+    // iPhoneは touch を優先（passive:false で preventDefault が効く）
+    oniPlane.addEventListener("touchstart", (e)=>{
+      e.preventDefault();
+      startFiring();
+    }, {passive:false});
+
+    document.addEventListener("touchend", stopFiring, {passive:false});
+    document.addEventListener("touchcancel", stopFiring, {passive:false});
+  </script>
+</body>
+</html>
