@@ -35,7 +35,7 @@ const FIRE_INTERVAL = 130;
 const MAX_BEANS = 8;
 
 // 音を鳴らす頻度（1=毎回, 2=2回に1回, 3=3回に1回）
-const SOUND_DIVIDER = 2;
+const SOUND_DIVIDER = 1;
 
 // =========================
 // 音（mp3 / HTMLAudio）
