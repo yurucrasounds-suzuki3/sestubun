@@ -142,7 +142,7 @@ function placeOniCenter() {
   oni.style.left = "50%";
   oni.style.top = "52%";
   oni.style.transform = "translate(-50%,-50%)";
-  hintEl.textContent = "画面を長押しで豆連射（当たると音）";
+  hintEl.textContent = "豆を投げろ！鬼は外！福は内！";
 }
 placeOniCenter();
 
