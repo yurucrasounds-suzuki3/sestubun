@@ -25,7 +25,7 @@ document.body.style.userSelect = "none";
 // 設定
 // =========================
 let hitCount = 0;
-const HIT_MAX = 9999999;
+const HIT_MAX = 9999;
 let isCongratulated = false;
 
 // 連射テンポ（iPhoneで気持ちいい＆安定帯）
